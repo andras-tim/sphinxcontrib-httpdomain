@@ -43,10 +43,23 @@ def translate_werkzeug_rule(rule):
     return buf.getvalue()
 
 
+def get_methods_in_order(methods):
+    FIXED_ORDER = ('GET', 'POST', 'PUT', 'DELETE')
+    methods = set(methods)
+
+    for method in FIXED_ORDER:
+        if method in methods:
+            yield method
+            methods.remove(method)
+
+    for method in sorted(methods):
+        yield method
+
+
 def get_routes(app):
     for rule in app.url_map.iter_rules():
         methods = rule.methods.difference(['OPTIONS', 'HEAD'])
-        for method in methods:
+        for method in get_methods_in_order(methods):
             path = translate_werkzeug_rule(rule.rule)
             yield method, path, rule.endpoint
 
