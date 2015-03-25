@@ -43,26 +43,27 @@ def translate_werkzeug_rule(rule):
     return buf.getvalue()
 
 
-def get_methods_in_order(methods):
-    FIXED_ORDER = ('GET', 'POST', 'PUT', 'DELETE')
-    methods = set(methods)
-
-    for method in FIXED_ORDER:
-        if method in methods:
-            yield method
-            methods.remove(method)
-
-    for method in sorted(methods):
-        yield method
-
-
 def get_routes(app):
     for rule in app.url_map.iter_rules():
+        path = translate_werkzeug_rule(rule.rule)
         methods = rule.methods.difference(['OPTIONS', 'HEAD'])
-        for method in get_methods_in_order(methods):
-            path = translate_werkzeug_rule(rule.rule)
+        for method in methods:
             yield method, path, rule.endpoint
 
+
+def get_route_order_key(item):
+    FIXED_ORDER = ('GET', 'POST', 'PUT', 'DELETE')
+    method, path, endpoint = item
+
+    method_index = len(FIXED_ORDER)
+    if method in FIXED_ORDER:
+        method_index = FIXED_ORDER.index(method)
+
+    return "%s__%03d__%02d" % (endpoint, len(path), method_index)
+
+def get_routes_in_order(app):
+    ordered_routes = sorted(get_routes(app), key=get_route_order_key)
+    return ordered_routes
 
 class AutoflaskDirective(Directive):
 
@@ -105,7 +106,7 @@ class AutoflaskDirective(Directive):
 
     def make_rst(self):
         app = import_object(self.arguments[0])
-        for method, path, endpoint in get_routes(app):
+        for method, path, endpoint in get_routes_in_order(app):
             try:
                 blueprint, _, endpoint_internal = endpoint.rpartition('.')
                 if self.blueprints and blueprint not in self.blueprints:
